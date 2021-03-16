@@ -1,0 +1,732 @@
+---
+title: "PUBOL 543 Dashboard"
+author: "Conor Hennessy, Adam Porton, Kailey Ulland, Maggie Delaney"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: embed
+---
+
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library("scales")
+library(sf)
+library(magrittr)
+library(scales)
+library(questionr)
+library(reshape)
+library(dplyr)
+library(tidyverse)
+library(rio)
+
+myWeb="https://github.com/Visual-Analytics-Project-UW-EvansSchool/ourMap/raw/main/"
+mapWorldVars=read_sf(paste0(myWeb,"mapWorldVars.geojson"))
+```
+
+Univariate Plots
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Maggie Univariate Plot
+
+```{r}
+link= "https://github.com/maggiedelaney/NigeriaData/raw/main/NGA_2020_NLPS_v06_M_CSV/r1_sect_2.csv"
+NigeriaData = read.csv(link)
+
+#summary(NigeriaData$sector)
+absoluteT=table(NigeriaData$sector,
+                exclude = '') 
+
+#absoluteT
+#prop.table(absoluteT)
+ToPlot=prop.table(absoluteT)*100
+#ToPlot
+
+tableFreq=as.data.frame(ToPlot)
+names(tableFreq)=c("Sector","Percent")
+#tableFreq
+  library(ggplot2)
+base = ggplot(data = tableFreq,
+              aes(x = Sector,
+                  y = Percent))
+plot1 = base + geom_bar(stat = "identity",
+                        fill = " light blue",
+                        color = "dark blue" ,
+                        width = 0.5)
+
+#plot1
+
+titleText='Percentage of Nigerian Households By Sector'
+subtitletext="As of May 2020"
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+
+plot2 = plot1 + labs(title=titleText, subtitle = subtitletext,
+                     caption = sourceText)
+#plot2
+
+#head(tableFreq$Sector)
+
+plot3= plot2 + xlab("Type of Sector") + ylab("Percent of Population")
+#plot3
+
+plot4 = plot3 + scale_x_discrete(labels=c("1. Urban" = "Urban", "2. Rural" = "Rural"))
+#plot4
+
+library("scales")
+#scales::percent(tableFreq$Percent) 
+#paste0(round(tableFreq$Percent,2), '%')
+LABELS=paste0(round(tableFreq$Percent,2), '%')
+plot5 = plot4 + geom_text(vjust=6, #hjust if flipping
+                          size = 5,
+                          aes(y = Percent ,
+                              label = LABELS))
+plot5
+
+
+```
+
+
+### Conor Univariate Plot
+
+```{r}
+# collecting data on which households are  rural/urban
+link="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+nigeria_wt_df <- as.data.frame(read.csv(file = url(link)))
+nigeria_wt_df <- nigeria_wt_df[,c("wt_baseline", "hhid")]
+#nigeria_sec_df$sector <- recode(nigeria_sec_df$sector, "1. Urban" = "Urban", 
+#                                "2. Rural" = "Rural")
+
+
+#get data on what shocks each household has experienced, and how they have been coping
+link = "https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_10.csv?raw=true"
+nigeria_shocks_and_coping_df <- as.data.frame(read.csv(file = url(link)))
+nigeria_shocks_df <- nigeria_shocks_and_coping_df[,c("hhid", "shock_cd", "s10q1")]
+nigeria_shocks_df <- nigeria_shocks_df[(nigeria_shocks_df$s10q1 != "2. NO"), ]
+nigeria_shocks_df <- nigeria_shocks_df[,c("hhid", "shock_cd")]
+
+#give shocks more readable descriptions
+nigeria_shocks_df$shock_cd <- recode(nigeria_shocks_df$shock_cd, 
+                                     "1. Illness, injury, or death of income earning member of household" = "Illness or death of income earner", 
+                                     "5. Job loss" = "Job Loss",
+                                     "6. Nonfarm business closure" = "Nonfarm business closure",
+                                     "7. Theft/looting of cash and other property" = "Theft",
+                                     "8. Disruption of farming, livestock, fishing activities" = "Disruption of farm activities",
+                                     "10. Increase in price of farming/business inputs" =  "Increased cost of doing business or farming",
+                                     "11. Fall in the price of farming/business output" = "Decreased price of products sold",
+                                     "12. Increase in price of major food items consumed" = "Increased price of food",
+                                     "96. Other (Specify)" = "Other")
+
+#combine with rural urban data, drop uninteresting cases (very few)
+nigeria_shocks_df <- merge(nigeria_shocks_df, nigeria_wt_df, by="hhid")
+nigeria_shocks_df <- nigeria_shocks_df[(nigeria_shocks_df$shock_cd != "Other"), ]
+
+
+#get frequencies of each shock  type by rural/urban
+shock_table <- wtd.table(nigeria_shocks_df$shock_cd,  weights = nigeria_shocks_df$wt_baseline)
+shock_table <- prop.table(shock_table)#, margin = 1)
+shock_df <- as.data.frame(shock_table)
+names(shock_df) <- c("shock", "pct")
+
+
+#MAKE PLOTS!
+
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+
+bar_plot_shocks <- ggplot(shock_df, aes(x = reorder(shock, pct),  y = pct, fill="navyblue") ) + 
+  geom_bar( stat = "identity", show.legend = FALSE) +
+  coord_flip() +
+  labs( title = "Shocks Experienced By Nigerians\nSince March 2020", subtitle = "As of May 2020", x =NULL, y = "% of households", caption = sourceText)
+
+bar_plot_shocks
+
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Adam Univariate Plot 
+
+```{r}
+link="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+DF_baseline <- as.data.frame(read.csv(link))
+
+DF <- DF_baseline %>%
+  select(zone,state, lga, sector, ea, hhid, interviewer_id, wt_baseline, s9q1, s9q2)
+DF <- rename(DF, covid_illness = s9q1,
+             covid_finance = s9q2)
+
+###covid_illness###
+#Create table
+covid_illness_tbl <- table(DF$covid_illness,
+                           exclude = "")
+covid_illness_tbl <- prop.table(covid_illness_tbl)*100
+#Create data frame
+covid_illness_frame=as.data.frame(covid_illness_tbl)
+#Rename vars
+names(covid_illness_frame)=c("covid_illness","pct")
+
+###covid_finance###
+#Create table
+covid_finance_tbl <- table(DF$covid_finance,
+                           exclude = "")
+covid_finance_tbl <- prop.table(covid_finance_tbl)*100
+#Create data frame
+covid_finance_frame=as.data.frame(covid_finance_tbl)
+#Rename vars
+names(covid_finance_frame)=c("covid_finance","pct")
+#tableFreq=tableFreq[order(tableFreq$pct),]
+
+base = ggplot(data = covid_finance_frame, 
+              aes(x = covid_finance, 
+                  y = pct)) 
+plot1 = base + geom_bar(stat = 'identity',
+                        fill = "#0073C2FF",
+                        width = .6)
+
+#Add in titles
+titleText='How much of a threat coronavirus outbreak to household finances?'
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+plot2 = plot1 + labs(title=titleText,
+                     x =NULL, 
+                     y = NULL,
+                     caption = sourceText)
+plot3 = plot2 + scale_y_continuous(labels=scales::unit_format(suffix = '%'))
+
+
+base = ggplot(data = covid_illness_frame, 
+              aes(x = covid_illness, 
+                  y = pct)) 
+plot1 = base + geom_bar(fill ="slateblue2",
+                        stat = 'identity',
+                        width = .6) 
+#Add in titles
+titleText='Nigerians\' Reported Level of Worry About COVID-19'
+subtitleText="As of May 2020"
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+plot2 = plot1 + labs(title=titleText, subtitle = subtitleText,
+                     x =NULL, 
+                     y = NULL,
+                     caption = sourceText)
+plot3 = plot2 + scale_y_continuous(labels=scales::unit_format(suffix = '%'))
+plot3
+```
+
+### Kailey Univariate Plot
+
+```{r}
+
+#open the dataset 
+link="https://github.com/Kent253/543/raw/main/r1_sect_a_3_4_5_6_8_9_12.csv"
+R_one=read.csv(link)
+
+#rename the variable
+names(R_one)[names(R_one) == "s4q1"] <- "handwashing_more"
+
+#set variable to a table
+#to get rid of unknown, exclude = ' '
+table1=table(R_one$handwashing_more,
+             exclude = '')
+
+#Rename all categories
+names(table1)[1]='YES'
+names(table1)[2]='NO'
+
+#show as percentages
+HandW=prop.table(table1)*100
+
+#Read table as a dataframe
+HandWa=as.data.frame(HandW)
+names(HandWa)=c("use_soap","pct")
+
+#building the base
+library(ggplot2)
+base= ggplot(data = HandWa, 
+             aes(x = use_soap,
+                 y = pct)) 
+
+graph1 = base + geom_bar(fill ="deepskyblue1",
+                         stat = 'identity') 
+
+# titles
+titleText='Percent of Nigerians Washing Hands More Often Since March 2020'
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+graph2 = graph1 + labs(title=titleText, subtitle = "As of May 2020",
+                       x =NULL, 
+                       y = NULL,
+                       caption = sourceText)
+
+library(scales)
+
+# labels on the bars
+LABS=paste0(round(HandWa$pct,2), '%')
+graph3 = graph2 + geom_text(vjust=-0,
+                            size = 4,
+                            aes(y = pct ,
+                                label = LABS))
+
+# theme classic and y axis percentage labels
+graph4= graph3 + theme_classic()+ scale_y_continuous(labels = scales::unit_format(suffix = '%'))
+graph4
+```
+
+
+Bivariate Plots
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+###  Conor Bivariate Plot
+
+```{r}
+# collecting the data
+link="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+nigeria_df <- as.data.frame(read.csv(file = url(link)))
+nigeria_df <- nigeria_df[,(names(nigeria_df) %in% c("s9q2","s6q4","wt_baseline"))]
+nigeria_df <- nigeria_df[complete.cases(nigeria_df), ] #may skew the results if incomplete cases are a nonrandom sample
+
+
+#get the weighted number of people who feel various levels of threatened by COVID19 as columns
+nigeria_df$threat[nigeria_df$s9q2 == "1. A substantial threat"] <- "Severe threat"
+nigeria_df$threat [nigeria_df$s9q2 == "2. A moderate threat"] <- "Medium threat"
+nigeria_df$threat [(nigeria_df$s9q2 == "3. Not much of a threat")|(nigeria_df$s9q2 == "4. Not a threat at all" )] <- "Little or no threat"
+
+#sort respondents in to industries
+nigeria_df$industry[nigeria_df$s6q4 ==  "1. AGRICULTURE, HUNTING, FISHING"] <- "Agriculture"
+nigeria_df$industry[(nigeria_df$s6q4 == "2. MINING, MANUFACTURING")] <- "Mining & Manufacturing"
+nigeria_df$industry[(nigeria_df$s6q4 == "3. ELECTRICITY, GAS, WATER SUPPLY")] <- "Utilities"
+nigeria_df$industry[(nigeria_df$s6q4 == "4. CONSTRUCTION")] <- "Construction"
+nigeria_df$industry[(nigeria_df$s6q4 == "7. PROFESSIONAL ACTIVITIES: FINANCE, LEGAL, ANALYSIS, COMPUTER, REAL ESTATE")] <- "Finance, Law, & Tech"
+nigeria_df$industry[(nigeria_df$s6q4 == "8. PUBLIC ADMINISTRATION")] <- "Public Administrationn"
+nigeria_df$industry[(nigeria_df$s6q4 == "5. BUYING &amp; SELLING GOODS, REPAIR OF GOODS, HOTELS &amp; RESTAURANTS")] <- "Service & Hospitality"
+nigeria_df$industry[(nigeria_df$s6q4 == "9. PERSONAL SERVICES, EDUCATION, HEALTH, CULTURE, SPORT, DOMESTIC WORK, OTHER")] <- "Other"
+
+
+industry_threat=wtd.table(nigeria_df$industry, nigeria_df$threat, weights = nigeria_df$wt_baseline)
+industry_threat_df=as.data.frame(industry_threat)
+names(industry_threat_df) <- c("industry","threat","counts")
+
+#marginal
+industry_threat_mg_col <- prop.table(industry_threat,margin = 2)
+#adding marginal
+industry_threat_df$pct_col <- as.data.frame(industry_threat_mg_col)[,3]
+
+base=ggplot(data <- industry_threat_df,  aes(x=reorder(industry, counts), y=counts, fill=threat))
+
+conditionColor <- ifelse(industry_threat_df$threat%in%c("Minor Threat",'No Threat'),'grey80','grey50')
+bar_stacked <- base + geom_bar(stat = "identity", position = 'stack')
+
+bar_stacked <- bar_stacked + theme( axis.text.x = element_text(angle = 30, hjust = 1, size=10 ))
+titleText='Number of Nigerian Housholds That Are Financially\nThreatened By COVID-19, By Industry'
+subtitleText='As of May 2020'
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+
+bar_stacked <- bar_stacked + labs(x = NULL, y = 'Number of Households', title=titleText, subtitle=subtitleText, x =NULL, y = NULL, caption = sourceText)
+bar_stacked <- bar_stacked + guides(fill=guide_legend(title="")) + scale_fill_brewer(palette = "Accent")
+
+
+bar_stacked
+```
+
+### Kailey Bivariate Plot
+
+```{r}
+
+#got the data
+link="https://github.com/Kent253/543/raw/main/r1_sect_a_3_4_5_6_8_9_12.csv"
+data=read.csv(link)
+
+#changing variable name
+names(data)[names(data) == "s6q12"] <- "industry"
+
+#data as table, excluding missing values
+Sectorxindustry=table(data$industry,data$sector, exclude = '')
+
+library(magrittr)
+sectorxindustry_mgCol=prop.table(Sectorxindustry, margin = 2)%>%round(.,3)
+
+SectorDF=as.data.frame(Sectorxindustry)
+names(SectorDF)=c("industry","sector","counts")
+
+#renaming the levels (shortened titles)
+levels(SectorDF$industry) <- c("Agriculture",
+                               "Manufacturing",
+                               "Electricity",
+                               "Construction",
+                               "Hospitality",
+                               "Transportation",
+                               "Professional",
+                               "Service")
+
+SectorDF$pctCol=as.data.frame(sectorxindustry_mgCol)[,3]
+SectorDF$Sector <- SectorDF$sector
+
+#all about that base
+library(ggplot2)
+base1=ggplot(data=SectorDF, 
+             aes(x=industry, y=counts,
+                 fill=Sector)) # this 'aes' in legend
+barDodge= base1 +  geom_bar(stat="identity",
+                            position ='dodge') 
+
+#angle the axis titles
+barDodge2 = barDodge + theme(axis.text.x = element_text(angle = 45, hjust = 1,size = 6),
+                             axis.text.y = element_text(size = 4))
+
+#titles
+TITLE = 'Empoyment Industry by Sector in Nigeria'
+SUBTITLE = 'As of May 2020'
+SOURCE = 'Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+barDodge2 = barDodge2 + 
+  labs(title=TITLE, subtitle=SUBTITLE, caption=SOURCE,
+                             x = NULL,
+                             y = 'Number of Households',
+                             source = SOURCE) +
+  scale_fill_brewer(palette = "Dark2") #+
+  #theme(axis.text = element_text(size = 15)) 
+
+barDodge2
+
+```
+
+Row 
+-----------------------------------------------------------------------
+
+### Maggie Bivariate Plot
+
+```{r}
+
+link="https://github.com/adam-porton/PubPol543/raw/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv"
+NigeriaData = read.csv(link)
+
+sectorNone=table(NigeriaData$sector,NigeriaData$s3q3__11)
+
+library(magrittr)
+NigeriaDatamgCol=prop.table(sectorNone,
+                             margin = 2)%>%round(.,3)
+NigeriaDatamgCol = NigeriaDatamgCol*100
+SectorNoneDF=as.data.frame(NigeriaDatamgCol)
+names(SectorNoneDF)=c("sector","Response","pctCol")
+
+SectorNoneDF$pctCol=as.data.frame(NigeriaDatamgCol)[,3]
+
+#str(NigeriaData$s3q3__11,width = 50,strict.width='cut')
+na.rm = TRUE
+sectorNonemgCol=table(NigeriaData$sector,NigeriaData$s3q3__11)
+sectorNonemgCol=as.data.frame(sectorNone)
+names(sectorNonemgCol)=c("sector","action","pctCol")
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+
+library(ggplot2)
+sectorNonemgCol$Sector <- sectorNonemgCol$sector
+base1=ggplot(data=sectorNonemgCol, 
+             aes(x=action, y=(pctCol/1200*100), 
+                 fill=Sector)) # this 'aes' in legend
+
+barDodge= base1 +  geom_bar(stat="identity",
+                            position ='dodge') 
+
+plot2 = barDodge + xlab(NULL) + ylab("Population")
+plot3 = plot2 + scale_x_discrete(labels=c("0" = "Changed Behavior", "1" = "Did Not Change Behavior")) 
+plot4 = plot3 + labs(title = "Portion of the Nigerian Population Taking\nAction to Prevent COVID-19, By Sector", subtitle = "As of May 2020", caption = sourceText)
+plot5 = plot4 + scale_y_continuous(labels = scales::percent_format(scale = 1))
+PCTAction = (sectorNonemgCol$pctCol/1200)*100
+#paste0(round(PCTAction,2), '%')
+LABELS=paste0(round(PCTAction,2), '%')
+plot6 = plot5 + geom_text(position = position_dodge(1),
+                          angle=360,
+                          vjust=-.5,
+                          hjust= 0.3,
+                          aes(label= LABELS))
+plot7 = plot6 + scale_fill_discrete(name="Sectors",
+                                    labels=c("Urban", "Rural")) + 
+  scale_fill_brewer(palette = "Dark2")
+plot7
+
+```
+
+### Adam Bivariate Plot
+
+```{r}
+###Load Nigeria COVID data baseline wave###
+link="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+DF_baseline <- as.data.frame(read.csv(link))
+###Subset by variables of interest###
+DF <- DF_baseline %>%
+  select(zone,state, lga, sector, ea, hhid, interviewer_id, wt_baseline, s9q1, s9q2)
+DF <- rename(DF, covid_illness = s9q1,
+             covid_finance = s9q2)
+
+###Create table of variables of interest (minus N/As)###
+##covid_illness##
+#Create table
+covid_illness_tbl <- table(DF$covid_illness,
+                           exclude = "")
+covid_illness_tbl <- prop.table(covid_illness_tbl)*100
+
+#Create data frame
+covid_illness_frame=as.data.frame(covid_illness_tbl)
+#Rename vars
+names(covid_illness_frame)=c("covid_illness","pct")
+
+##covid_finance##
+#Create table
+covid_finance_tbl <- table(DF$covid_finance,
+                           exclude = "")
+covid_finance_tbl <- prop.table(covid_finance_tbl)*100
+
+#Create data frame
+covid_finance_frame=as.data.frame(covid_finance_tbl)
+#Rename vars
+names(covid_finance_frame)=c("covid_finance","pct")
+
+
+#tableFreq=tableFreq[order(tableFreq$pct),]
+
+###Create covid_finance bar chart on full sample (minus N/As)###
+base = ggplot(data = covid_finance_frame, 
+              aes(x = covid_finance, 
+                  y = pct)) 
+plot1 = base + geom_bar(stat = 'identity',
+                        fill = "#0073C2FF",
+                        width = .6)
+
+###Bivariate plots###
+library(magrittr)
+IllnessvsFinance=table(DF$covid_illness,DF$covid_finance,exclude = '') #Cross tab
+IllnessvsFinance_mgCol=prop.table(IllnessvsFinance,
+                                  margin = 2)%>%round(.,3) #Pct
+
+#making a data frame from contingency table
+
+IllnessvsFinanceDF=as.data.frame(IllnessvsFinance)
+names(IllnessvsFinanceDF)=c("illness","finance","counts")
+IllnessvsFinanceDF <- IllnessvsFinanceDF[complete.cases(IllnessvsFinanceDF),]
+#adding marginal percents:
+IllnessvsFinanceDF$pctCol=as.data.frame(IllnessvsFinance_mgCol)[,3]
+
+IllnessvsFinanceDF <- IllnessvsFinanceDF %>% mutate(illness = factor(illness, levels = rev(levels(illness))))
+
+###Additional plot elements###
+library(ggplot2)
+IllnessvsFinanceDF$Illness <- IllnessvsFinanceDF$illness
+IllnessvsFinanceDF$pctCol <- IllnessvsFinanceDF$pctCol*100
+
+base1=ggplot(data=IllnessvsFinanceDF, 
+             aes(x=finance, y=pctCol,
+                 fill=Illness, width=.85)) # this 'aes' in legend
+
+barDodge= base1 +  geom_bar(stat="identity",
+                            position ='dodge',
+                            color = "dark blue") 
+#barDodge
+plot2 <- barDodge + scale_fill_brewer(palette="Red")
+
+plot3 <- plot2 + theme(axis.text.x = element_text(size=7,angle = 30, hjust = 1))
+#TODO: reverse order of numbers in illness groups and find better 1st green color?; title; annotation; new axis labels; spread out finance columns?
+
+#Add in titles
+titleText='Concern About COVID-19 Illness and\nConcern About COVID-19 Threat to Finances'
+subtitleText="As of May 2020"
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+
+plot4 = plot3 + labs(title=titleText,subtitle=subtitleText,
+                     x =NULL, 
+                     y = NULL,
+                     caption = sourceText)
+
+plot5 = plot4 + scale_y_continuous(labels=scales::unit_format(suffix = '%'))
+
+plot5
+
+```
+
+Maps
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Conor Map
+
+```{r, eval=TRUE,warning=FALSE,message=FALSE}
+link="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+nigeria_df_states <- as.data.frame(read.csv(file = url(link)))
+nigeria_df_states <- nigeria_df_states[,c("wt_baseline", "state", "hhid")]
+
+link="https://github.com/adam-porton/PubPol543/blob/main/Data/r1_sect_7.csv?raw=true"
+nigeria_df_income <- as.data.frame(read.csv(file = url(link)))
+nigeria_df_income$lost_income <- as.integer(nigeria_df_income$s7q2 == "3. Reduced")
+nigeria_df_income <- aggregate(lost_income ~ hhid, nigeria_df_income, max)
+nigeria_df_income <- merge(nigeria_df_states, nigeria_df_income, by="hhid")
+remove(nigeria_df_states)
+nigeria_df_income$lost_income <- nigeria_df_income$lost_income*nigeria_df_income$wt_baseline
+nigeria_df_income <- aggregate(cbind(lost_income, wt_baseline)~state, nigeria_df_income, sum)
+nigeria_df_income$lost_income <- 100*(nigeria_df_income$lost_income/nigeria_df_income$wt_baseline)
+nigeria_df_income <- nigeria_df_income[,c("state", "lost_income")]
+
+nigeria_df_income$state[(substring(nigeria_df_income$state,2,2) == ".")] <- substr(nigeria_df_income$state[(substring(nigeria_df_income$state,2,2) == ".")] , 4, length(nigeria_df_income$state))
+nigeria_df_income$state[(substring(nigeria_df_income$state,3,3) == ".")] <- substr(nigeria_df_income$state[(substring(nigeria_df_income$state,3,3) == ".")] , 5, length(nigeria_df_income$state))
+nigeria_df_income$state[(nigeria_df_income$state == "FCT")] <- "Fct, Abuja"
+
+linkMap="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/raw/main/Data/nigeria_geojson.geojson" 
+
+map_ng=read_sf(linkMap)
+
+map_ng_vars=merge(map_ng, nigeria_df_income, by='state') 
+
+titletext <- "Pecentage of Nigerians Who Have Experienced\na Decrease in Income Since March 2020"
+subtitletext <- "By State, as of May 2020"
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+
+
+map=ggplot(data=map_ng) + geom_sf(fill='grey90',color=NA) + 
+  theme_classic() +
+  geom_sf(data=map_ng_vars, aes(fill=lost_income), color=NA) + 
+  scale_fill_gradient(low = 'blue', high= 'red') +
+  guides(fill=guide_legend(title="Percentage of people")) +
+  ggtitle(titletext, subtitletext) +
+  labs( caption = sourceText) +
+  scale_fill_gradient(low = 'salmon', high= 'darkred', na.value = "grey90")
+map
+
+```
+
+
+### Maggie Map
+```{r, eval=TRUE,warning=FALSE,message=FALSE}
+link="https://github.com/adam-porton/PubPol543/raw/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv"
+NigeriaData_states = as.data.frame(read.csv(file = url(link)))
+NigeriaData_states = NigeriaData_states[,c("wt_baseline", "state", "hhid")]
+link="https://github.com/maggiedelaney/PubPol543/raw/patch-1/Data/r2_sect_a_2_5_6_8_12.csv"
+NigeriaData_NoWork = as.data.frame(read.csv(file = url(link)))
+NigeriaData_NoWork$nowork_lastweek = as.integer(NigeriaData_NoWork$s6q1c == "1. BUSINESS / OFFICE CLOSED DUE TO CORONAVIRUS LEGAL RESTRICTIONS")
+NigeriaData_NoWork = aggregate(nowork_lastweek ~ hhid, NigeriaData_NoWork, max)
+NigeriaData_NoWork = merge(NigeriaData_states, NigeriaData_NoWork, by="hhid")
+remove(NigeriaData_states)
+NigeriaData_NoWork$nowork_lastweek = NigeriaData_NoWork$nowork_lastweek*NigeriaData_NoWork$wt_baseline
+NigeriaData_NoWork = aggregate(cbind(nowork_lastweek, wt_baseline)~state, NigeriaData_NoWork, sum)
+NigeriaData_NoWork$nowork_lastweek = (NigeriaData_NoWork$nowork_lastweek/NigeriaData_NoWork$wt_baseline)*100
+NigeriaData_NoWork = NigeriaData_NoWork[,c("state", "nowork_lastweek")]
+NigeriaData_NoWork$state[(substring(NigeriaData_NoWork$state,2,2) == ".")] = substr(NigeriaData_NoWork$state[(substring(NigeriaData_NoWork$state,2,2) == ".")] , 4, length(NigeriaData_NoWork$state))
+NigeriaData_NoWork$state[(substring(NigeriaData_NoWork$state,3,3) == ".")] = substr(NigeriaData_NoWork$state[(substring(NigeriaData_NoWork$state,3,3) == ".")] , 5, length(NigeriaData_NoWork$state))
+NigeriaData_NoWork$state[(NigeriaData_NoWork$state == "FCT")] = "Fct, Abuja"
+linkMap="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/raw/main/Data/nigeria_geojson.geojson" 
+library(sf)
+map_ng=read_sf(linkMap)
+map_ng_vars=merge(map_ng, NigeriaData_NoWork, by='state')
+titletext = "Pecentage of Nigerians Who Missed Work in the Last Week\nDue to Office Closures"
+subtitletext = "By State, as of May 2020"
+sourceText ='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+library(ggplot2)
+map=ggplot(data=map_ng) + geom_sf(fill='grey90',color=NA) + 
+  theme_classic() +
+  geom_sf(data=map_ng_vars, aes(fill=nowork_lastweek), color=NA) + 
+  guides(fill=guide_legend(title="Percentage of People")) +
+  ggtitle(titletext, subtitletext) +
+  labs( caption = sourceText) +
+  scale_fill_gradient(low = 'darkblue',
+                                    high= 'orchid2',
+                                    na.value = "grey90")
+#colMap
+map
+```
+
+Row
+-----------------------------------------------------------------------
+### Adam Map
+```{r, eval=TRUE,warning=FALSE,message=FALSE}
+link="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+nigeria_df_states <- as.data.frame(read.csv(file = url(link)))
+nigeria_df_states <- nigeria_df_states[,c("wt_baseline", "state", "hhid")]
+
+link="https://github.com/adam-porton/PubPol543/blob/main/Data/r1_sect_a_3_4_5_6_8_9_12.csv?raw=true"
+nigeria_df_foodsec <- as.data.frame(read.csv(file = url(link)))
+nigeria_df_foodsec$food_insecure <- as.integer(nigeria_df_foodsec$s8q8 == "1. YES")
+nigeria_df_foodsec <- aggregate(food_insecure ~ hhid, nigeria_df_foodsec, max)
+nigeria_df_foodsec <- merge(nigeria_df_states, nigeria_df_foodsec, by="hhid")
+remove(nigeria_df_states)
+nigeria_df_foodsec$food_insecure <- nigeria_df_foodsec$food_insecure*nigeria_df_foodsec$wt_baseline
+nigeria_df_foodsec <- aggregate(cbind(food_insecure, wt_baseline)~state, nigeria_df_foodsec, sum)
+nigeria_df_foodsec$food_insecure <- 100*(nigeria_df_foodsec$food_insecure/nigeria_df_foodsec$wt_baseline)
+nigeria_df_foodsec <- nigeria_df_foodsec[,c("state", "food_insecure")]
+
+nigeria_df_foodsec$state <- as.character(nigeria_df_foodsec$state)
+
+nigeria_df_foodsec$state[(substring(nigeria_df_foodsec$state,2,2) == ".")] <-    substr(nigeria_df_foodsec$state[(substring(nigeria_df_foodsec$state,2,2) == ".")] , 4, length(nigeria_df_foodsec$state))
+
+nigeria_df_foodsec$state[(substring(nigeria_df_foodsec$state,3,3) == ".")] <- substr(nigeria_df_foodsec$state[(substring(nigeria_df_foodsec$state,3,3) == ".")] , 5, length(nigeria_df_foodsec$state))
+
+nigeria_df_foodsec$state[(nigeria_df_foodsec$state == "FCT")] <- "Fct, Abuja"
+
+#Set Nasarawa to NA since very few respondents
+nigeria_df_foodsec$food_insecure[(nigeria_df_foodsec$state=="Nasarawa")] <- NA
+
+linkMap="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/raw/main/Data/nigeria_geojson.geojson" 
+
+map_ng=read_sf(linkMap)
+
+map_ng_vars=merge(map_ng, nigeria_df_foodsec, by='state') 
+
+titletext <- "Pecentage of Nigerians Who Reported Being Food Insecure"
+subtitletext <- "By State, as of May 2020"
+sourceText='Source: LSMS-Supported High-Frequency Phone Surveys on COVID-19'
+note= 'Grey = No data'
+
+map=ggplot(data=map_ng) + geom_sf(fill='grey90',color=NA) + 
+  theme_classic() +
+  geom_sf(data=map_ng_vars, aes(fill=food_insecure), color=NA) + 
+  scale_fill_gradient(low = 'blue', high= 'red',na.value = "grey50") +
+  guides(fill=guide_legend(title="Percentage of people")) +
+  ggtitle(titletext, subtitletext) +
+  labs( caption = sourceText, note)
+map
+
+```
+
+### Kailey Map
+```{r, eval=TRUE,warning=FALSE,message=FALSE}
+
+link='https://github.com/Kent253/543/raw/main/Covid_Cases_by_State.csv'
+data.covid=read.csv(link)
+
+linkMap="https://github.com/cfhenn/nigeria_covid_survey_r_visualizations/raw/main/Data/nigeria_geojson.geojson" 
+map_ng=read_sf(linkMap)
+
+library(sf)
+
+names(map_ng)[names(map_ng) == "state"] <- "STATE"
+
+
+map_ng_vars=merge(map_ng, #map first
+                  data.covid,
+                  by='STATE') 
+
+library(ggplot2)
+# plot original map - color=NA is about borders
+base=ggplot(data=map_ng) + geom_sf(fill='grey90',
+                                   color='grey50') + theme_classic()
+
+map_ng_vars$pop_cov <- map_ng_vars$CASES/map_ng_vars$POP_2016
+
+map_ng_vars$pop_death <- map_ng_vars$DEATHS/map_ng_vars$POP_2016 * 100
+map_ng_vars$Deaths <- map_ng_vars$DEATHS
+titletext = "Number of COVID-19 Deaths"
+subtitletext = "By State, as of May 2020"
+colMap= base + geom_sf(data=map_ng_vars,
+                       aes(fill=Deaths, text=paste("State:",STATE)),
+                       color=NA)
+colMap=colMap + scale_fill_gradient(low = 'yellow',
+  high= 'red',
+  na.value = "grey90")+
+  ggtitle(titletext, subtitletext) +
+  labs( caption = sourceText) +
+  labs(fill = "Total Number of Deaths")
+
+colMap
+```
